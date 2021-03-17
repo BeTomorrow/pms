@@ -1,0 +1,243 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+USER_CONFIG_PATH=~/.pms
+USER_CONFIG_API_KEY=api-key
+
+PROJECT_CONFIG_PATH=pms.config
+PROJECT_CONFIG_NAME=name
+PROJECT_CONFIG_COLLECTION_FILE=collection-file
+PROJECT_CONFIG_COLLECTION_NAME=collection-name
+PROJECT_CONFIG_ENVIRONMENT_FILE=environment-file
+PROJECT_CONFIG_ENVIRONMENT_NAME=environment-name
+PROJECT_CONFIG_REMOTE_REPOSITORY=remote-repository
+
+configReadItem() {
+  local default_value=${3:-""}
+  local value=$( (grep -E "^${2}=" -m 1 "${1}" 2>/dev/null || echo "VAR=${default_value}") | head -n 1 | cut -d '=' -f 2-)
+  if [ -z "$value" ] && [ -n "$default_value" ]; then
+    value="$default_value"
+  fi
+  printf -- "%s" "${value}"
+}
+
+userConfigGet() {
+  local value="$(configReadItem "${USER_CONFIG_PATH}" "${1}" "${2:-""}")"
+  printf -- "%s" "${value}"
+}
+
+projectConfigGet() {
+  local value="$(configReadItem "${PROJECT_CONFIG_PATH}" "${1}" "${2:-""}")"
+  printf -- "%s" "${value}"
+}
+
+saveCollection() {
+  COLLECTION_UID=$(curl -sS --fail -X GET 'https://api.getpostman.com/collections' -H "x-api-key: $API_KEY" | jq -r ".collections[] | select(.name == \"$COLLECTION_NAME\") | .uid")
+  if [ -z "$COLLECTION_UID" ]; then
+    echo "Unable to find $COLLECTION_NAME collection, skipping."
+  else
+    echo "Found existing $COLLECTION_NAME collection, downloading it..."
+    TMP_FILE=$(mktemp)
+    curl -sS --fail -X GET -H "x-api-key: $API_KEY" -H "content-type: application/json" "https://api.getpostman.com/collections/$COLLECTION_UID" | jq -r '.collection' >"$TMP_FILE"
+    # remove all ids
+    cat $TMP_FILE | jq 'walk(if (type == "object" and (._postman_id or .id)) then del(._postman_id, .id) else . end )' >"$COLLECTION_FILE"
+  fi
+}
+
+loadCollection() {
+  local COLLECTION_UID=$(curl -sS --fail -X GET 'https://api.getpostman.com/collections' -H "x-api-key: $API_KEY" | jq -r ".collections[] | select(.name == \"$COLLECTION_NAME\") | .uid")
+  if [ -z "$COLLECTION_UID" ]; then
+    echo "Unable to find $COLLECTION_NAME collection, creating it..."
+    RESULT=$(cat "$COLLECTION_FILE" | jq -r --compact-output '{collection:.}' | curl -sS --fail -X POST -H "x-api-key: $API_KEY" -H "content-type: application/json" -d @- https://api.getpostman.com/collections)
+  else
+    echo "Found existing $COLLECTION_NAME collection, updating it..."
+    RESULT=$(cat "$COLLECTION_FILE" | jq -r --compact-output '{collection:.}' | curl -sS --fail -X PUT -H "x-api-key: $API_KEY" -H "content-type: application/json" -d @- "https://api.getpostman.com/collections/$COLLECTION_UID")
+  fi
+}
+
+saveEnvironment() {
+  local ENVIRONMENT_UID=$(curl -sS --fail -X GET 'https://api.getpostman.com/environments' -H "x-api-key: $API_KEY" | jq -r ".environments[] | select(.name == \"$ENVIRONMENT_NAME\") | .uid")
+  if [ -z "$ENVIRONMENT_UID" ]; then
+    echo "Unable to find $ENVIRONMENT_NAME environment, skipping."
+  else
+    echo "Found existing $ENVIRONMENT_NAME environment, downloading it..."
+    TMP_FILE=$(mktemp)
+    curl -sS --fail -X GET -H "x-api-key: $API_KEY" -H "content-type: application/json" "https://api.getpostman.com/environments/$ENVIRONMENT_UID" | jq -r '.environment' >"$TMP_FILE"
+    # remove all ids and values
+    cat "$TMP_FILE" |
+      jq 'walk(if (type == "object" and (._postman_id or .id)) then del(._postman_id, .id) else . end )' |
+      jq 'walk(if (type == "object" and (.value)) then .value = "" else . end)' \
+        >"$ENVIRONMENT_FILE"
+  fi
+}
+
+loadEnvironment() {
+  ENVIRONMENT_UID=$(curl -sS --fail -X GET 'https://api.getpostman.com/environments' -H "x-api-key: $API_KEY" | jq -r ".environments[] | select(.name == \"$ENVIRONMENT_NAME\") | .uid")
+  if [ -z "$ENVIRONMENT_UID" ]; then
+    echo "Unable to find $ENVIRONMENT_NAME environment, creating it..."
+    RESULT=$(cat "$ENVIRONMENT_FILE" | jq -r --compact-output '{environment:.}' | curl -sS --fail -X POST -H "x-api-key: $API_KEY" -H "content-type: application/json" -d @- https://api.getpostman.com/environments)
+  else
+    echo "Found existing $ENVIRONMENT_NAME environment, updating it..."
+    RESULT=$(cat "$ENVIRONMENT_FILE" | jq -r --compact-output '{environment:.}' | curl -sS --fail -X PUT -H "x-api-key: $API_KEY" -H "content-type: application/json" -d @- "https://api.getpostman.com/environments/$ENVIRONMENT_UID")
+  fi
+}
+
+remoteGitArchive() {
+  echo "Retrieving from remote repository $REMOTE_REPOSITORY"
+  local paths=("$@")
+  if [ ${#paths[@]} -gt 0 ]; then
+    git archive --remote="$REMOTE_REPOSITORY" master "${paths[@]}" | tar -x
+  fi
+}
+
+save() {
+  if [ -n "$COLLECTION_NAME" ]; then
+    saveCollection
+  fi
+  if [ -n "$ENVIRONMENT_NAME" ]; then
+    saveEnvironment
+  fi
+}
+
+load() {
+  if [ -n "$COLLECTION_NAME" ]; then
+    loadCollection
+  fi
+  if [ -n "$ENVIRONMENT_NAME" ]; then
+    loadEnvironment
+  fi
+}
+
+loadRemote() {
+  if [ -z "$REMOTE_REPOSITORY" ]; then
+    echo "No '${PROJECT_CONFIG_REMOTE_REPOSITORY}' configuration set."
+    exit 2
+  fi
+
+  local paths=()
+  if [ "${COLLECTION_NAME}" ]; then
+    paths+=("${COLLECTION_FILE}")
+  fi
+  if [ "${ENVIRONMENT_NAME}" ]; then
+    paths+=("${ENVIRONMENT_FILE}")
+  fi
+  if [ ${#paths[@]} -eq 0 ]; then
+    echo "No collection or environment file to retrieve, skipping."
+    return 0
+  fi
+
+  TMP_DIR=$(mktemp -d)
+  pushd "$TMP_DIR" >/dev/null
+  remoteGitArchive "${paths[@]}"
+  load
+  popd >/dev/null
+}
+
+readUserConfig() {
+  if [ ! -f "${USER_CONFIG_PATH}" ]; then
+    echo "No user configuration found. Please create your '${USER_CONFIG_PATH}' file."
+    exit 3
+  fi
+
+  API_KEY="$(userConfigGet "${USER_CONFIG_API_KEY}")"
+
+  if [ -z "${API_KEY}" ]; then
+    echo "No '${USER_CONFIG_API_KEY}' configuration set in '${USER_CONFIG_PATH}'."
+    exit 4
+  fi
+}
+
+readProjectConfig() {
+  if [ ! -f "${PROJECT_CONFIG_PATH}" ]; then
+    echo "No project configuration found. Please create your '${PROJECT_CONFIG_PATH}' file."
+    exit 5
+  fi
+
+  PROJECT_NAME="$(projectConfigGet "${PROJECT_CONFIG_NAME}")"
+  COLLECTION_FILE="$(projectConfigGet "${PROJECT_CONFIG_COLLECTION_FILE}" "${PROJECT_NAME}.postman_collection.json")"
+  COLLECTION_NAME="$(projectConfigGet "${PROJECT_CONFIG_COLLECTION_NAME}")"
+  ENVIRONMENT_FILE="$(projectConfigGet "${PROJECT_CONFIG_ENVIRONMENT_FILE}" "${PROJECT_NAME}.postman_environment.json")"
+  ENVIRONMENT_NAME="$(projectConfigGet "${PROJECT_CONFIG_ENVIRONMENT_NAME}")"
+  REMOTE_REPOSITORY="$(projectConfigGet "${PROJECT_CONFIG_REMOTE_REPOSITORY}")"
+}
+
+initProjectProperty() {
+  local property=$1
+  local header=$2
+  local prompt=$3
+  echo "${header}"
+  read -r -p "${prompt}" REPLY
+  if [ -n "${REPLY}" ]; then
+    echo "${property}=${REPLY}" >>"${PROJECT_CONFIG_PATH}"
+  fi
+}
+
+init() {
+  if [ ! -f "${USER_CONFIG_PATH}" ]; then
+    echo "Creating user configuration file '${USER_CONFIG_PATH}'"
+    touch "${USER_CONFIG_PATH}"
+    chmod 0600 "${USER_CONFIG_PATH}"
+    read -s -r -p "Enter Postman API key: " INIT_USER_API_KEY
+    echo ""
+    echo "${USER_CONFIG_API_KEY}=${INIT_USER_API_KEY}" >>"${USER_CONFIG_PATH}"
+    unset INIT_USER_API_KEY
+  fi
+  if [ ! -f "${PROJECT_CONFIG_PATH}" ]; then
+    echo "Creating project configuration file '${PROJECT_CONFIG_PATH}'"
+    initProjectProperty "${PROJECT_CONFIG_NAME}" "Enter name, used for collection and environment files names by default" "Name: "
+    initProjectProperty "${PROJECT_CONFIG_COLLECTION_NAME}" "Collection name in Postman, leave empty to skip collection handling" "Collection name: "
+    if [ -n "${REPLY}" ]; then
+      initProjectProperty "${PROJECT_CONFIG_COLLECTION_FILE}" "Collection file name, leave empty to use default file name" "Collection file name: "
+    fi
+    initProjectProperty "${PROJECT_CONFIG_ENVIRONMENT_NAME}" "Sample environment name in Postman, leave empty to skip environment handling" "Environment name: "
+    if [ -n "${REPLY}" ]; then
+      initProjectProperty "${PROJECT_CONFIG_ENVIRONMENT_FILE}" "Environment file name, leave empty to use default file name" "Environment file name: "
+    fi
+    initProjectProperty "${PROJECT_CONFIG_REMOTE_REPOSITORY}" "Enter remote git repository, optional" "Repository: "
+  fi
+  echo "All set."
+}
+
+usage() {
+  echo "Usage:"
+  echo -e "\t$0 <command>"
+  echo -e "Commands:"
+  echo -e "\tsave: save Postman cloud collection and environment to local files"
+  echo -e "\tload: load local files to Postman cloud collection and environment"
+  echo -e "\tload-remote: load files from remote repository to Postman cloud collection and environment"
+  echo -e "\tinit: help setup configuration files"
+  echo ""
+  echo "Project configuration file: $PROJECT_CONFIG_PATH"
+  echo "User configuration file: $USER_CONFIG_PATH"
+  exit "$1"
+}
+
+if [ $# -eq 1 ] && [ "$1" = "init" ]; then
+  init
+  exit 0
+fi
+
+readUserConfig
+readProjectConfig
+
+if [ $# -eq 1 ]; then
+  command="$1"
+  case $command in
+  save)
+    save
+    ;;
+  load)
+    load
+    ;;
+  load-remote)
+    loadRemote
+    ;;
+  *)
+    echo "Unknown command: $command"
+    usage 1
+    ;;
+  esac
+else
+  usage 1
+fi
