@@ -6,6 +6,12 @@ keep a versioned export of a collection.
 Bash compatible shell, curl, jq, optionally git.
 You also need a [Postman API key](https://learning.postman.com/docs/developer/intro-api/).
 
+# Homebrew Install
+
+```
+brew install betomorrow/draft/pms
+```
+
 # Manual Install
 
 Checkout this repo, add `+x` permission to `pms` if needed and add the
