@@ -13,6 +13,47 @@ PROJECT_CONFIG_ENVIRONMENT_FILE=environment-file
 PROJECT_CONFIG_ENVIRONMENT_NAME=environment-name
 PROJECT_CONFIG_REMOTE_REPOSITORY=remote-repository
 
+############ MANAGE ARGUMENTS ###############
+# source : https://stackoverflow.com/a/33826763/7219905
+
+usage() {
+  echo "Usage:"
+  echo -e "\t$0 <command> [arguments]"
+  echo -e "Commands:"
+  echo -e "\t-t, --to-disk: download collection and environment from Postman cloud to local disk"
+  echo -e "\t-f, --from-disk: upload local collection and environment to Postman cloud"
+  echo -e "\t-g, --from-git: load collection and environment from a git remote repository to Postman cloud"
+  echo -e "\t-i, --init: help setup configuration files"
+  echo ""
+  echo "Project configuration file: $PROJECT_CONFIG_PATH"
+  echo "User configuration file: $USER_CONFIG_PATH"
+  exit 1
+}
+
+action=""
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    -h|--help)
+      usage ;;
+    -i|--init)
+      action="init" ;;
+    -f|--from-disk)
+      action="from-disk" ;;
+    -t|--to-disk)
+      action="to-disk" ;;
+    -g|--from-git)
+      action="from-git" ;;
+    --)
+      break ;;
+    *)
+      echo "Unknown parameter passed ($1). Display help with: $0 --help"; exit 1 ;;
+  esac
+  shift
+done
+
+
+############ DEFINE FUNCTIONS ###############
+
 configReadItem() {
   local default_value=${3:-""}
   local value=$( (grep -E "^${2}=" -m 1 "${1}" 2>/dev/null || echo "VAR=${default_value}") | head -n 1 | cut -d '=' -f 2-)
@@ -169,7 +210,7 @@ initProjectProperty() {
   echo "${header}"
   read -r -p "${prompt}" REPLY
   if [ -n "${REPLY}" ]; then
-    echo "${property}=${REPLY}" >>"${PROJECT_CONFIG_PATH}"
+    echo "${property}=${REPLY}" >> "${PROJECT_CONFIG_PATH}"
   fi
 }
 
@@ -180,7 +221,7 @@ init() {
     chmod 0600 "${USER_CONFIG_PATH}"
     read -s -r -p "Enter Postman API key: " INIT_USER_API_KEY
     echo ""
-    echo "${USER_CONFIG_API_KEY}=${INIT_USER_API_KEY}" >>"${USER_CONFIG_PATH}"
+    echo "${USER_CONFIG_API_KEY}=${INIT_USER_API_KEY}" >> "${USER_CONFIG_PATH}"
     unset INIT_USER_API_KEY
   fi
   if [ ! -f "${PROJECT_CONFIG_PATH}" ]; then
@@ -199,45 +240,16 @@ init() {
   echo "All set."
 }
 
-usage() {
-  echo "Usage:"
-  echo -e "\t$0 <command>"
-  echo -e "Commands:"
-  echo -e "\tto-disk: download collection and environment from Postman cloud to local disk"
-  echo -e "\tfrom-disk: upload local collection and environment to Postman cloud"
-  echo -e "\tfrom-git: load collection and environment from a git remote repository to Postman cloud"
-  echo -e "\tinit: help setup configuration files"
-  echo ""
-  echo "Project configuration file: $PROJECT_CONFIG_PATH"
-  echo "User configuration file: $USER_CONFIG_PATH"
-  exit "$1"
-}
 
-if [ $# -eq 1 ] && [ "$1" = "init" ]; then
-  init
-  exit 0
-fi
+############ RUN PROGRAM ###############
 
 readUserConfig
 readProjectConfig
 
-if [ $# -eq 1 ]; then
-  command="$1"
-  case $command in
-  "to-disk")
-    toDisk
-    ;;
-  "from-disk")
-    fromDisk
-    ;;
-  "from-git")
-    fromGit
-    ;;
-  *)
-    echo "Unknown command: $command"
-    usage 1
-    ;;
-  esac
-else
-  usage 1
-fi
+case "$action" in
+  init) init ;;
+  from-disk) fromDisk ;;
+  to-disk) toDisk ;;
+  from-git) fromGit ;;
+esac
+
