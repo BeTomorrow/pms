@@ -91,7 +91,7 @@ remoteGitArchive() {
   fi
 }
 
-save() {
+toDisk() {
   if [ -n "$COLLECTION_NAME" ]; then
     saveCollection
   fi
@@ -100,7 +100,7 @@ save() {
   fi
 }
 
-load() {
+fromDisk() {
   if [ -n "$COLLECTION_NAME" ]; then
     loadCollection
   fi
@@ -109,7 +109,7 @@ load() {
   fi
 }
 
-loadRemote() {
+fromGit() {
   if [ -z "$REMOTE_REPOSITORY" ]; then
     echo "No '${PROJECT_CONFIG_REMOTE_REPOSITORY}' configuration set."
     exit 2
@@ -130,7 +130,7 @@ loadRemote() {
   TMP_DIR=$(mktemp -d)
   pushd "$TMP_DIR" >/dev/null
   remoteGitArchive "${paths[@]}"
-  load
+  fromDisk
   popd >/dev/null
 }
 
@@ -203,9 +203,9 @@ usage() {
   echo "Usage:"
   echo -e "\t$0 <command>"
   echo -e "Commands:"
-  echo -e "\tsave: save Postman cloud collection and environment to local files"
-  echo -e "\tload: load local files to Postman cloud collection and environment"
-  echo -e "\tload-remote: load files from remote repository to Postman cloud collection and environment"
+  echo -e "\tto-disk: download collection and environment from Postman cloud to local disk"
+  echo -e "\tfrom-disk: upload local collection and environment to Postman cloud"
+  echo -e "\tfrom-git: load collection and environment from a git remote repository to Postman cloud"
   echo -e "\tinit: help setup configuration files"
   echo ""
   echo "Project configuration file: $PROJECT_CONFIG_PATH"
@@ -224,14 +224,14 @@ readProjectConfig
 if [ $# -eq 1 ]; then
   command="$1"
   case $command in
-  save)
-    save
+  "to-disk")
+    toDisk
     ;;
-  load)
-    load
+  "from-disk")
+    fromDisk
     ;;
-  load-remote)
-    loadRemote
+  "from-git")
+    fromGit
     ;;
   *)
     echo "Unknown command: $command"
