@@ -12,6 +12,7 @@ PROJECT_CONFIG_COLLECTION_NAME=collection-name
 PROJECT_CONFIG_ENVIRONMENT_FILE=environment-file
 PROJECT_CONFIG_ENVIRONMENT_NAME=environment-name
 PROJECT_CONFIG_REMOTE_REPOSITORY=remote-repository
+PROJECT_CONFIG_REMOTE_REPOSITORY_BRANCH=remote-repository-branch
 
 configReadItem() {
   local default_value=${3:-""}
@@ -84,10 +85,10 @@ loadEnvironment() {
 }
 
 remoteGitArchive() {
-  echo "Retrieving from remote repository $REMOTE_REPOSITORY"
+  echo "Retrieving from remote repository $REMOTE_REPOSITORY (branch $REMOTE_REPOSITORY_BRANCH)"
   local paths=("$@")
   if [ ${#paths[@]} -gt 0 ]; then
-    git archive --remote="$REMOTE_REPOSITORY" master "${paths[@]}" | tar -x
+    git archive --remote="$REMOTE_REPOSITORY" "$REMOTE_REPOSITORY_BRANCH" "${paths[@]}" | tar -x
   fi
 }
 
@@ -112,6 +113,11 @@ load() {
 loadRemote() {
   if [ -z "$REMOTE_REPOSITORY" ]; then
     echo "No '${PROJECT_CONFIG_REMOTE_REPOSITORY}' configuration set."
+    exit 2
+  fi
+
+  if [ -z "$REMOTE_REPOSITORY_BRANCH" ]; then
+    echo "No '${PROJECT_CONFIG_REMOTE_REPOSITORY_BRANCH}' configuration set."
     exit 2
   fi
 
@@ -160,6 +166,7 @@ readProjectConfig() {
   ENVIRONMENT_FILE="$(projectConfigGet "${PROJECT_CONFIG_ENVIRONMENT_FILE}" "${PROJECT_NAME}.postman_environment.json")"
   ENVIRONMENT_NAME="$(projectConfigGet "${PROJECT_CONFIG_ENVIRONMENT_NAME}")"
   REMOTE_REPOSITORY="$(projectConfigGet "${PROJECT_CONFIG_REMOTE_REPOSITORY}")"
+  REMOTE_REPOSITORY_BRANCH="$(projectConfigGet "${PROJECT_CONFIG_REMOTE_REPOSITORY_BRANCH}")"
 }
 
 initProjectProperty() {
@@ -195,6 +202,9 @@ init() {
       initProjectProperty "${PROJECT_CONFIG_ENVIRONMENT_FILE}" "Environment file name, leave empty to use default file name" "Environment file name: "
     fi
     initProjectProperty "${PROJECT_CONFIG_REMOTE_REPOSITORY}" "Enter remote git repository, optional" "Repository: "
+    if [ -n "${REPLY}" ]; then
+      initProjectProperty "${PROJECT_CONFIG_REMOTE_REPOSITORY_BRANCH}" "Enter remote git repository branch" "Branch name: "
+    fi
   fi
   echo "All set."
 }

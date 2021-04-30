@@ -68,6 +68,10 @@ environment-file=something-else.json
 # Remote repository, optional
 # Used for load-remote to retrieve files to load into Postman cloud
 remote-repository=git@somehost.com:repo/project.git
+
+# Remote repository branch
+# Required to use the remote repository
+remote-repository-branch=main
 ```
 
 ## Commands
