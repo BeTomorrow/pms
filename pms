@@ -202,7 +202,9 @@ init() {
       initProjectProperty "${PROJECT_CONFIG_ENVIRONMENT_FILE}" "Environment file name, leave empty to use default file name" "Environment file name: "
     fi
     initProjectProperty "${PROJECT_CONFIG_REMOTE_REPOSITORY}" "Enter remote git repository, optional" "Repository: "
-    initProjectProperty "${PROJECT_CONFIG_REMOTE_REPOSITORY_BRANCH}" "Enter remote git repository branch, optional" "Branch name: "
+    if [ -n "${REPLY}" ]; then
+      initProjectProperty "${PROJECT_CONFIG_REMOTE_REPOSITORY_BRANCH}" "Enter remote git repository branch" "Branch name: "
+    fi
   fi
   echo "All set."
 }
