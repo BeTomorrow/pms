@@ -88,7 +88,7 @@ remoteGitArchive() {
   echo "Retrieving from remote repository $REMOTE_REPOSITORY (branch $REMOTE_REPOSITORY_BRANCH)"
   local paths=("$@")
   if [ ${#paths[@]} -gt 0 ]; then
-    git archive --remote="$REMOTE_REPOSITORY" $REMOTE_REPOSITORY_BRANCH "${paths[@]}" | tar -x
+    git archive --remote="$REMOTE_REPOSITORY" "$REMOTE_REPOSITORY_BRANCH" "${paths[@]}" | tar -x
   fi
 }
 
