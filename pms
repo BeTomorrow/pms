@@ -15,8 +15,7 @@ PROJECT_CONFIG_ENVIRONMENT_FILE=environment-file
 PROJECT_CONFIG_ENVIRONMENT_NAME=environment-name
 PROJECT_CONFIG_REMOTE_REPOSITORY=remote-repository
 
-############ MANAGE ARGUMENTS ###############
-# source : https://stackoverflow.com/a/33826763/7219905
+#region MANAGE ARGUMENTS
 
 usage() {
   echo "Usage:"
@@ -53,8 +52,9 @@ while [[ "$#" -gt 0 ]]; do
   shift
 done
 
+#endregion
 
-############ DEFINE FUNCTIONS ###############
+#region DEFINE FUNCTIONS
 
 configReadItem() {
   local default_value=${3:-""}
@@ -276,8 +276,9 @@ init() {
   echo "All set."
 }
 
+#endregion
 
-############ RUN PROGRAM ###############
+#region RUN PROGRAM
 
 readUserConfig
 readProjectConfig
@@ -289,3 +290,4 @@ case "$action" in
   from-git) fromGit ;;
 esac
 
+#endregion
