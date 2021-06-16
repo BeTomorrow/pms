@@ -30,10 +30,16 @@ usage() {
   echo ""
   echo "Project configuration file: $PROJECT_CONFIG_PATH"
   echo "User configuration file: $USER_CONFIG_PATH"
+  echo ""
+  echo "Example to load collection from a git repository:"
+  echo -e "\t$0 from-git git@somehost.com:repo/project.git"
+  echo -e "\t$0 from-git git@somehost.com:repo/project.git master"
   exit 1
 }
 
 action=""
+remoteName=""
+remoteBranch=""
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
     help)
@@ -45,7 +51,18 @@ while [[ "$#" -gt 0 ]]; do
     save | to-disk)
       action="to-disk" ;;
     load-remote | from-git)
-      action="from-git" ;;
+      if [ $# -eq 1 ]; then
+        action="from-git-local-config"
+      else
+        action="from-git-remote-config"
+        remoteName="$2"
+        if [ $# -ge 3 ]; then
+          remoteBranch="$3"
+          shift
+        fi
+        shift
+      fi
+      ;;
     --)
       break ;;
     *)
@@ -163,10 +180,12 @@ loadEnvironment() {
 }
 
 remoteGitArchive() {
-  echo "Retrieving from remote repository $REMOTE_REPOSITORY (branch $REMOTE_REPOSITORY_BRANCH)"
   local paths=("$@")
+  remote_repository="$1"
+  remote_repository_branch="$2"
+  local paths=("${@:3}")
   if [ ${#paths[@]} -gt 0 ]; then
-    git archive --remote="$REMOTE_REPOSITORY" "$REMOTE_REPOSITORY_BRANCH" "${paths[@]}" | tar -x
+    git archive --remote="$remote_repository" "$remote_repository_branch" "${paths[@]}" | tar -x
   fi
 }
 
@@ -188,12 +207,44 @@ fromDisk() {
   fi
 }
 
-fromGit() {
+fromGitRemoteConfig() {
+  remote_repository="$1"
+  remote_repository_branch="${2:-master}"
+
+  if [ -z "$remote_repository" ]; then
+    echo "No remote repository set."
+    exit 2
+  fi
+
+  echo "Retrieving from remote repository $remote_repository:$remote_repository_branch"
+
+  pushd $(mktemp -d) >/dev/null
+
+  remoteGitArchive "$remote_repository" "$remote_repository_branch" "$PROJECT_CONFIG_PATH"
+  readProjectConfig
+
+  local paths=()
+  if [ "${COLLECTION_NAME}" ]; then
+    paths+=("${COLLECTION_FILE}")
+  fi
+  if [ "${ENVIRONMENT_NAME}" ]; then
+    paths+=("${ENVIRONMENT_FILE}")
+  fi
+  if [ ${#paths[@]} -eq 0 ]; then
+    echo "No collection or environment file to retrieve, skipping."
+    return 0
+  fi
+
+  remoteGitArchive "$remote_repository" "$remote_repository_branch" "${paths[@]}"
+  fromDisk
+  popd >/dev/null
+}
+
+fromGitLocalConfig() {
   if [ -z "$REMOTE_REPOSITORY" ]; then
     echo "No '${PROJECT_CONFIG_REMOTE_REPOSITORY}' configuration set."
     exit 2
   fi
-
   if [ -z "$REMOTE_REPOSITORY_BRANCH" ]; then
     echo "No '${PROJECT_CONFIG_REMOTE_REPOSITORY_BRANCH}' configuration set."
     exit 2
@@ -211,9 +262,8 @@ fromGit() {
     return 0
   fi
 
-  TMP_DIR=$(mktemp -d)
-  pushd "$TMP_DIR" >/dev/null
-  remoteGitArchive "${paths[@]}"
+  pushd $(mktemp -d) >/dev/null
+  remoteGitArchive "$REMOTE_REPOSITORY" "$REMOTE_REPOSITORY_BRANCH" "${paths[@]}"
   fromDisk
   popd >/dev/null
 }
@@ -268,6 +318,7 @@ init() {
     echo "${USER_CONFIG_API_KEY}=${INIT_USER_API_KEY}" >> "${USER_CONFIG_PATH}"
     unset INIT_USER_API_KEY
   fi
+
   if [ ! -f "${PROJECT_CONFIG_PATH}" ]; then
     echo "Creating project configuration file '${PROJECT_CONFIG_PATH}'"
     initProjectProperty "${PROJECT_CONFIG_NAME}" "Enter name, used for collection and environment files names by default" "Name: "
@@ -291,14 +342,29 @@ init() {
 
 #region RUN PROGRAM
 
-readUserConfig
-readProjectConfig
-
 case "$action" in
   init) init ;;
-  from-disk) fromDisk ;;
-  to-disk) toDisk ;;
-  from-git) fromGit ;;
+
+  from-disk)
+    readUserConfig
+    readProjectConfig
+    fromDisk ;;
+
+  to-disk)
+    readUserConfig
+    readProjectConfig
+    toDisk ;;
+
+  from-git-local-config)
+    readUserConfig
+    readProjectConfig
+    fromGitLocalConfig ;;
+
+  from-git-remote-config)
+    readUserConfig
+    fromGitRemoteConfig "$remoteName" "$remoteBranch" ;;
+
+  *) usage ;;
 esac
 
 #endregion
