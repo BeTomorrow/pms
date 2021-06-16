@@ -31,7 +31,7 @@ usage() {
   echo "Project configuration file: $PROJECT_CONFIG_PATH"
   echo "User configuration file: $USER_CONFIG_PATH"
   echo ""
-  echo "Example to load collecion from a git repository:"
+  echo "Example to load collection from a git repository:"
   echo -e "\t$0 from-git git@somehost.com:repo/project.git"
   echo -e "\t$0 from-git git@somehost.com:repo/project.git master"
   exit 1
