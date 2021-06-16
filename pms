@@ -190,8 +190,6 @@ remoteGitArchive() {
 }
 
 toDisk() {
-  readProjectConfig
-
   if [ -n "$COLLECTION_NAME" ]; then
     saveCollection
   fi
@@ -201,8 +199,6 @@ toDisk() {
 }
 
 fromDisk() {
-  readProjectConfig
-
   if [ -n "$COLLECTION_NAME" ]; then
     loadCollection
   fi
@@ -245,8 +241,6 @@ fromGitRemoteConfig() {
 }
 
 fromGitLocalConfig() {
-  readProjectConfig
-
   if [ -z "$REMOTE_REPOSITORY" ]; then
     echo "No '${PROJECT_CONFIG_REMOTE_REPOSITORY}' configuration set."
     exit 2
@@ -315,8 +309,6 @@ initProjectProperty() {
 }
 
 init() {
-  readProjectConfig
-
   if [ ! -f "${USER_CONFIG_PATH}" ]; then
     echo "Creating user configuration file '${USER_CONFIG_PATH}'"
     touch "${USER_CONFIG_PATH}"
@@ -350,14 +342,28 @@ init() {
 
 #region RUN PROGRAM
 
-readUserConfig
-
 case "$action" in
   init) init ;;
-  from-disk) fromDisk ;;
-  to-disk) toDisk ;;
-  from-git-local-config) fromGitLocalConfig ;;
-  from-git-remote-config) fromGitRemoteConfig "$remoteName" "$remoteBranch" ;;
+
+  from-disk)
+    readUserConfig
+    readProjectConfig
+    fromDisk ;;
+
+  to-disk)
+    readUserConfig
+    readProjectConfig
+    toDisk ;;
+
+  from-git-local-config)
+    readUserConfig
+    readProjectConfig
+    fromGitLocalConfig ;;
+
+  from-git-remote-config)
+    readUserConfig
+    fromGitRemoteConfig "$remoteName" "$remoteBranch" ;;
+
   *) usage ;;
 esac
 
