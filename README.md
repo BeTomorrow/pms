@@ -107,15 +107,25 @@ Upload local collection and environment to Postman cloud.
 
 ### "from-git" or "load-remote"
 
+*With* a `pms.config` configuration in your directory, you can retrieve collection and environment files
+from a git `remote-repository` branch, and uploads to Postman cloud.
+
 ```
 pms from-git
 pms load-remote
 ```
 
-Retrieve collection and environment files from a git `remote-repository`
-master branch, and uploads to Postman cloud. This is meant as a lightweight
-way to keep a collection up-to-date without using a local clone of the
-repository. You still need a `pms.config` configuration, and `~/.pms`.
+*Without* a `pms.config` configuration in your directory, you can still retrieve collection and
+environment files from a git `remote-repository` branch, and uploads to Postman cloud by giving them as
+arguments.
+
+```
+pms from-git git@somehost.com:repo/project.git
+pms load-remote git@somehost.com:repo/project.git main
+```
+
+This is meant as a lightweight way to keep a collection up-to-date without using a local clone of the
+repository. You still need a `~/.pms`.
 
 # Note about environment
 
