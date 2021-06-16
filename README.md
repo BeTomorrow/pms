@@ -82,26 +82,29 @@ pms init
 
 Help set up user and project configuration files if missing.
 
-### save
+### "to disk" or "save"
 
 ```
+pms to-disk
 pms save
 ```
 
 Download collection and environment from Postman cloud and save them locally.
-Environment file is scrubbed from values and ids. 
+Environment file is scrubbed from values and ids.
 
-### load
+### "from-disk" or "load"
 
 ```
+pms from-disk
 pms load
 ```
 
 Upload local collection and environment to Postman cloud.
 
-### load-remote
+### "from-git" or "load-remote"
 
 ```
+pms from-git
 pms load-remote
 ```
 

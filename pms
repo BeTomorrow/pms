@@ -21,10 +21,11 @@ usage() {
   echo "Usage:"
   echo -e "\t$0 <command> [arguments]"
   echo -e "Commands:"
-  echo -e "\tto-disk: download collection and environment from Postman cloud to local disk"
-  echo -e "\tfrom-disk: upload local collection and environment to Postman cloud"
-  echo -e "\tfrom-git: load collection and environment from a git remote repository to Postman cloud"
+  echo -e "\tsave, to-disk: download collection and environment from Postman cloud to local disk"
+  echo -e "\tload, from-disk: upload local collection and environment to Postman cloud"
+  echo -e "\tload-remote, from-git: load collection and environment from a git remote repository to Postman cloud"
   echo -e "\tinit: help setup configuration files"
+  echo -e "\thelp: show this help"
   echo ""
   echo "Project configuration file: $PROJECT_CONFIG_PATH"
   echo "User configuration file: $USER_CONFIG_PATH"
@@ -38,16 +39,16 @@ while [[ "$#" -gt 0 ]]; do
       usage ;;
     init)
       action="init" ;;
-    from-disk)
+    load | from-disk)
       action="from-disk" ;;
-    to-disk)
+    save | to-disk)
       action="to-disk" ;;
-    from-git)
+    load-remote | from-git)
       action="from-git" ;;
     --)
       break ;;
     *)
-      echo "Unknown parameter passed ($1). Display help with: $0 --help"; exit 1 ;;
+      echo "Unknown parameter passed ($1). Display help with: $0 help"; exit 1 ;;
   esac
   shift
 done
