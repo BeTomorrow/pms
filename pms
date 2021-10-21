@@ -94,14 +94,20 @@ projectConfigGet() {
   printf -- "%s" "${value}"
 }
 
+apiGetCollectionUid() {
+  local uid=$(curl -sS --fail -X GET "${POSTMAN_BASE_URL}/collections" -H "x-api-key: $API_KEY" | jq -r ".collections[] | select(.name == \"$COLLECTION_NAME\") | .uid" | uniq)
+  printf -- "%s" "${uid}"
+}
+
 saveCollection() {
-  local COLLECTION_UID=$(curl -sS --fail -X GET "${POSTMAN_BASE_URL}/collections" -H "x-api-key: $API_KEY" | jq -r ".collections[] | select(.name == \"$COLLECTION_NAME\") | .uid")
+  local COLLECTION_UID=$(apiGetCollectionUid)
 
   case $(expr $(wc -w <<< $COLLECTION_UID)) in
     0) echo "Unable to find $COLLECTION_NAME collection, skipping."
       return ;;
     1) ;;
-    *) echo "Found too many collections with this name $COLLECTION_NAME: $COLLECTION_UID, skipping."
+    *) echo "Found too many collections with this name $COLLECTION_NAME, skipping. UIDs matching that name:"
+      echo "$COLLECTION_UID"
       return ;;
   esac
 
@@ -118,7 +124,7 @@ loadCollection() {
     return
   fi
 
-  local COLLECTION_UID=$(curl -sS --fail -X GET "${POSTMAN_BASE_URL}/collections" -H "x-api-key: $API_KEY" | jq -r ".collections[] | select(.name == \"$COLLECTION_NAME\") | .uid")
+  local COLLECTION_UID=$(apiGetCollectionUid)
 
   case $(expr $(wc -w <<< $COLLECTION_UID)) in
     0)
@@ -130,19 +136,26 @@ loadCollection() {
       local res=$(cat "$COLLECTION_FILE" | jq -r --compact-output '{collection:.}' | curl -sS --fail -X PUT -H "x-api-key: $API_KEY" -H "content-type: application/json" -d @- "${POSTMAN_BASE_URL}/collections/$COLLECTION_UID")
       ;;
     *)
-      echo "Found too many collections with this name $COLLECTION_NAME: $COLLECTION_UID, skipping."
+      echo "Found too many collections with this name $COLLECTION_NAME, skipping. UIDs matching that name:"
+      echo "$COLLECTION_UID"
       return ;;
   esac
 }
 
+apiGetEnvironmentUid() {
+  local ENVIRONMENT_UID=$(curl -sS --fail -X GET "${POSTMAN_BASE_URL}/environments" -H "x-api-key: $API_KEY" | jq -r ".environments[] | select(.name == \"$ENVIRONMENT_NAME\") | .uid" | uniq)
+  printf -- "%s" "${ENVIRONMENT_UID}"
+}
+
 saveEnvironment() {
-  local ENVIRONMENT_UID=$(curl -sS --fail -X GET "${POSTMAN_BASE_URL}/environments" -H "x-api-key: $API_KEY" | jq -r ".environments[] | select(.name == \"$ENVIRONMENT_NAME\") | .uid")
+  local ENVIRONMENT_UID=$(apiGetEnvironmentUid)
 
   case $(expr $(wc -w <<< $ENVIRONMENT_UID)) in
     0) echo "Unable to find $ENVIRONMENT_NAME collection, skipping."
       return ;;
     1) ;;
-    *) echo "Found too many environments with this name $ENVIRONMENT_NAME: $ENVIRONMENT_UID, skipping."
+    *) echo "Found too many environments with this name $ENVIRONMENT_NAME, skipping. UIDs matching that name:"
+      echo "$ENVIRONMENT_UID"
       return ;;
   esac
 
@@ -162,7 +175,7 @@ loadEnvironment() {
     return
   fi
 
-  local ENVIRONMENT_UID=$(curl -sS --fail -X GET "${POSTMAN_BASE_URL}/environments" -H "x-api-key: $API_KEY" | jq -r ".environments[] | select(.name == \"$ENVIRONMENT_NAME\") | .uid")
+  local ENVIRONMENT_UID=$(apiGetEnvironmentUid)
 
   case $(expr $(wc -w <<< $ENVIRONMENT_UID)) in
     0)
@@ -174,7 +187,8 @@ loadEnvironment() {
       local res=$(cat "$ENVIRONMENT_FILE" | jq -r --compact-output '{environment:.}' | curl -sS --fail -X PUT -H "x-api-key: $API_KEY" -H "content-type: application/json" -d @- "${POSTMAN_BASE_URL}/environments/$ENVIRONMENT_UID")
       ;;
     *)
-      echo "Found too many environments with this name $ENVIRONMENT_NAME: $ENVIRONMENT_UID, skipping."
+      echo "Found too many environments with this name $ENVIRONMENT_NAME, skipping. UIDs matching that name:"
+      echo "$ENVIRONMENT_UID"
       return ;;
   esac
 }
