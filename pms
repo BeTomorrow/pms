@@ -115,7 +115,7 @@ saveCollection() {
   local tmp_file=$(mktemp)
   curl -sS --fail -X GET -H "x-api-key: $API_KEY" -H "content-type: application/json" "${POSTMAN_BASE_URL}/collections/$COLLECTION_UID" | jq -r '.collection' > "$tmp_file"
   # remove all ids
-  cat $tmp_file | jq 'walk(if (type == "object" and (._postman_id or .id)) then del(._postman_id, .id) else . end )' > "$COLLECTION_FILE"
+  cat $tmp_file | jq 'walk(if (type == "object" and (.uid or ._postman_id or .id)) then del(.uid, ._postman_id, .id) else . end )' > "$COLLECTION_FILE"
 }
 
 loadCollection() {
@@ -164,7 +164,7 @@ saveEnvironment() {
   curl -sS --fail -X GET -H "x-api-key: $API_KEY" -H "content-type: application/json" "${POSTMAN_BASE_URL}/environments/$ENVIRONMENT_UID" | jq -r '.environment' > "$tmp_file"
   # remove all ids and values
   cat "$tmp_file" |
-    jq 'walk(if (type == "object" and (._postman_id or .id)) then del(._postman_id, .id) else . end )' |
+    jq 'walk(if (type == "object" and (.uid or ._postman_id or .id)) then del(.uid, ._postman_id, .id) else . end )' |
     jq 'walk(if (type == "object" and (.value)) then .value = "" else . end)' \
       >"$ENVIRONMENT_FILE"
 }
